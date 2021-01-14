@@ -1,48 +1,46 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
-
 name: release
+
 on:
   push:
     tags:
       - 'v*'
-    branches: 
-      - master
 
 env:
-  ATOMCODE: demo
+  ATOMCODE: ${${{ GITHUB_REPOSITORY }}#${{ GITHUB_ACTOR }}/}
 
 jobs:
-  build:
+  deploy:
 
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [2.7, 3.6]
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: '2.x'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install setuptools wheel twine
     - name: package
+      id: release_step
       run: |
         python setup.py sdist
+        
+        release_time=$(date "+%Y%m%d%H%M%S")
+        release_pkg_name=${{ env.ATOMCODE }}-${release_time}-release.zip
+        echo "::set-output name=release_pkg_name::$release_pkg_name"
+        
         cp task.json dist/
-        cd dist
-        tar -czvf ${{ env.ATOMCODE}}-${{ matrix.python-version }}-release.zip *
+        cd dist        
+        zip $release_pkg_name *
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2
       with:
-        name: ${{ env.ATOMCODE}}-${{ matrix.python-version }}-release.zip
+        name: ${{ steps.release_step.outputs.release_pkg_name }}
         # A file, directory or wildcard pattern that describes what to upload
-        path: ./dist/${{ env.ATOMCODE}}-${{ matrix.python-version }}-release.zip
+        path: ./dist/${{ steps.release_step.outputs.release_pkg_name }}
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
@@ -51,14 +49,14 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: ${{ github.ref }}
-        draft: true
-        prerelease: true
+        draft: false
+        prerelease: false
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ github.token }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/${{ env.ATOMCODE}}-${{ matrix.python-version }}-release.zip
-        asset_name: ${{ env.ATOMCODE}}-${{ matrix.python-version }}-release.zip
+        asset_path: ./dist/${{ steps.release_step.outputs.release_pkg_name }}
+        asset_name: ${{ steps.release_step.outputs.release_pkg_name }}
         asset_content_type: application/zip
