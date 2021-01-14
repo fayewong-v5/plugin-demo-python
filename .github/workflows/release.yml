@@ -4,9 +4,8 @@ on:
   push:
     tags:
       - 'v*'
-
-env:
-  ATOMCODE: ${${{ GITHUB_REPOSITORY }}#${{ GITHUB_ACTOR }}/}
+    branches: 
+      - master
 
 jobs:
   deploy:
@@ -29,7 +28,8 @@ jobs:
         python setup.py sdist
         
         release_time=$(date "+%Y%m%d%H%M%S")
-        release_pkg_name=${{ env.ATOMCODE }}-${release_time}-release.zip
+        repository=${{ github.repository }}
+        release_pkg_name=${repository##*/}-${release_time}-release.zip
         echo "::set-output name=release_pkg_name::$release_pkg_name"
         
         cp task.json dist/
